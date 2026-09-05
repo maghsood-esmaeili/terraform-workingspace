@@ -1,32 +1,18 @@
 provider "aws" {
-    region = "us-east-1"
+    region = "us-east-1" 
 }
-
-# resource "aws_instance" "my_server" {
-#     ami = "ami-0b6d9d3d33ba97d99"
-#     instance_type = "t2.nano"
-#     tags = {
-#         Name = "simple-server-new"
-#     }
-#     vpc_security_group_ids = [ aws_security_group.instance.id ]
-#     user_data = <<-EOF
-#                 #!/bin/bash
-#                 echo "Hello, World" > index.html
-#                 nohup busybox httpd -f -p ${var.webserver_port_number} &
-#                 EOF
-#     user_data_replace_on_change = true
-# }
 
 resource "aws_launch_configuration" "ASG_config" {
     image_id = "ami-0b6d9d3d33ba97d99"
     instance_type = "t2.micro"
     
     security_groups = [ aws_security_group.instance.id ]
-    user_data = <<-EOF
-                #!/bin/bash
-                echo "Hello, World" > index.html
-                nohup busybox httpd -f -p ${var.webserver_port_number} &
-                EOF  
+    user_data = templatefile("user-data.sh", {
+        server_port = var.webserver_port_number
+        db_address = data.terraform_remote_state.db.outputs.address
+        db_port = data.terraform_remote_state.db.outputs.port
+    })
+
 }
 resource "aws_autoscaling_group" "ASG_example" {
   launch_configuration = aws_launch_configuration.ASG_config.name
@@ -111,7 +97,7 @@ resource "aws_security_group" "alb" {
     egress {
         from_port = 0
         to_port = 0
-        protocol = "tcp"
+        protocol = "-1"
         cidr_blocks = [ "0.0.0.0/0" ]
     }
   
@@ -140,19 +126,13 @@ resource "aws_security_group" "instance" {
   
 }
 
-
-
 variable "webserver_port_number" {
     description = "port number for web server"
     type = number  
     default = 8080
 }
 
-output "alb_dns_name" {
-    value = aws_lb.alb_sample.dns_name
-    description = "The domain name of the load balancer"
-  
-}
+
 
 variable "object_example" {
     description = "An example of a structureal type in Terraform"
@@ -170,9 +150,11 @@ variable "object_example" {
     }
   
 }
-
-# $env:AWS_ACCESS_KEY_ID="<ACCESS_KEY>"  
-# $env:AWS_SECRET_ACCESS_KEY="<SECRET_KEY>"
-
-# export AWS_ACCESS_KEY_ID="<ACCESS_KEY>"  
-# export AWS_SECRET_ACCESS_KEY="<SECRET_KEY>"
+data "terraform_remote_state" "db" {
+    backend = "s3"
+    config =  {
+        bucket = "terraform-up-and-running-maghsood"
+        key = "stage/data-stores/mysql/terraform.tfstate"
+        region = "us-east-1"
+    }
+}
