@@ -3,13 +3,14 @@ provider "aws" {
   region = "us-east-1"
 }
 
-resource "aws_s3_account_public_access_block" "access_public" {
+resource "aws_s3_account_public_access_block" "access-public" {
   block_public_acls = true
   block_public_policy = true
 }
 
 resource "aws_s3_bucket" "example" {
-    bucket = "terraform-up-and-running-maghsood"
+    bucket = "terraform-up-and-running-maghsood-new"
+    
     lifecycle {
       prevent_destroy = true
     }
