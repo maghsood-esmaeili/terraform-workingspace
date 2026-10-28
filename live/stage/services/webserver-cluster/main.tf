@@ -9,16 +9,13 @@ module "webserver_cluster" {
   instance_type = "t2.micro"
   min_size = 1
   max_size = 2
+  enable_autoscaling = true
 }
 
-resource "aws_security_group_rule" "inbound_port" {
-  security_group_id = module.webserver_cluster.alb_security_group_id
-  type = "ingress"
-  from_port = 12345
-  to_port = 12345
-  protocol = "tcp"
-  cidr_blocks = ["0.0.0.0/0"] 
-  
+module "lightsail_project" {
+  source = "../../../../modules/services/serverless/lightsail"
+  lightsail_name = "my_web_server"
+  availability_zone = "us-east-1a"
 }
 
 terraform {

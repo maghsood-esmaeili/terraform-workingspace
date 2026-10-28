@@ -32,6 +32,21 @@ resource "aws_autoscaling_group" "ASG_example" {
     value = "${var.cluster_name}-asg"
     propagate_at_launch = true
   }
+
+  dynamic "tag" {
+    for_each = {
+      for key, value in var.custome_tags:
+      key => upper(value)
+      if key != "Name"
+    }
+  content {
+    key = tag.key
+    value = tag.value
+    propagate_at_launch = true
+  }
+
+    
+  }
   lifecycle {
     create_before_destroy = true
   }
@@ -110,7 +125,6 @@ resource "aws_security_group" "alb" {
     name = "${var.cluster_name}-alb"
 }
 
-
 data "aws_subnets" "default" {
   filter {
     name = "vpc-id"
@@ -140,21 +154,34 @@ variable "webserver_port_number" {
 }
 
 
+resource "aws_autoscaling_schedule" "scaling_out_during_buisness_hours" {
+  count = var.enable_autoscaling ? 1:0
+  scheduled_action_name = "scale-out-during-business-hours"
+  min_size = 1
+  max_size = 2
+  desired_capacity = 2
+  recurrence = "0 9 * * *"
+  autoscaling_group_name = module.webserver_cluster.asg_name
+}
 
-variable "object_example" {
-    description = "An example of a structureal type in Terraform"
-    type = object({
-      name = string
-      age = number
-      tag = list(string)
-      enabled = bool
-    })
-    default = {
-      name = "maghsood"
-      age = 31
-      tag = [ "software engineer", "DevOps", "Cloud Engineer" ]
-      enabled = true
-    }
+resource "aws_autoscaling_schedule" "scaling_in_at_night" {
+  count = var.enable_autoscaling ? 1:0
+  scheduled_action_name = "scale-in-at-night"
+  min_size = 1
+  max_size = 1
+  desired_capacity = 1
+  recurrence = "0 17 * * *"
+  autoscaling_group_name = module.webserver_cluster.asg_name
+}
+
+resource "aws_security_group_rule" "inbound_port" {
+  security_group_id = module.webserver_cluster.alb_security_group_id
+  count = var.expose_x_port ? 1:0
+  type = "ingress"
+  from_port = 12345
+  to_port = 12345
+  protocol = "tcp"
+  cidr_blocks = ["0.0.0.0/0"] 
   
 }
 data "terraform_remote_state" "db" {
@@ -166,12 +193,3 @@ data "terraform_remote_state" "db" {
     }
 }
 
-output "asg_name" {
-    value = aws_autoscaling_group.ASG_example.name
-    description = "The name of the Auto Scaling Group"
-}
-output "alb_security_group_id" {
-    value = aws_security_group.alb.id
-    description = "The ID of the Security Group attached to the load balancer"
-  
-}
